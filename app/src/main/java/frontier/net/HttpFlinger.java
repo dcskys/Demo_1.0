@@ -22,6 +22,16 @@ public class HttpFlinger {
     private HttpFlinger() {
     }
 
+
+     //为了解决String 类型
+    private static final StringParser DEFAULT_PARSER = new StringParser();
+
+    public static void get(String reqUrl, DataListener<String> listener) {
+        get(reqUrl, DEFAULT_PARSER, listener);
+    }
+
+
+
     /**
      * 发送get请求
      *
@@ -51,18 +61,18 @@ public class HttpFlinger {
                         urlConnection.disconnect();
                     }
                 }
+                // TODO : 当请求失败时数据会返回为null,导致很多地方需要判空,如何优化这一步呢?
+
                 return null;
             }
 
             @Override
             protected void onPostExecute(T result) {
 
+                //有时候启动时  result  进行了回调但是结果为空  ，这里可以不为空的判断
 
-
-                if (listener != null) {
+                if (listener != null ) {
                     listener.onComplete(result); //接口回调结果
-
-
                 }
 
             }

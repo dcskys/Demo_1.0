@@ -24,63 +24,45 @@
 
 package com.dc.bookdemo;
 
-import android.annotation.SuppressLint;
 import android.app.Fragment;
 import android.content.Intent;
-import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v4.widget.SwipeRefreshLayout;
 import android.support.v4.widget.SwipeRefreshLayout.OnRefreshListener;
 import android.support.v7.widget.LinearLayoutManager;
-import android.text.TextUtils;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
 import com.dc.bookdemo.adapters.ArticleAdapter;
 import com.dc.bookdemo.beans.Article;
+import com.dc.bookdemo.mvpview.ArticleListView;
+import com.dc.bookdemo.presenter.ArticleListPresenter;
 
-import org.json.JSONArray;
-import org.json.JSONObject;
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.LinkedList;
 import java.util.List;
 
-import frontier.db.DatabaseHelper;
-import frontier.listeners.DataListener;
 import frontier.listeners.OnItemClickListener;
 import frontier.net.ArticleParser;
-import frontier.net.HttpFlinger;
 import frontier.widgets.AutoLoadRecyclerView;
 
 /**
  * 文章列表主界面,包含自动滚动广告栏、文章列表
- * 
+ *
  * @author mrsimple
  */
 public class ArticleListFragment extends Fragment implements OnRefreshListener,
-        AutoLoadRecyclerView.OnLoadListener {
+        AutoLoadRecyclerView.OnLoadListener, ArticleListView {
 
     protected ArticleAdapter mAdapter;
     protected SwipeRefreshLayout mSwipeRefreshLayout; //刷新控件
     protected AutoLoadRecyclerView mRecyclerView;
 
-    private int mPageIndex = 1;
-
-    ArticleParser mArticleParser = new ArticleParser(); //json解析器 ，解析网络返回
+    private ArticleListPresenter mPresenter = new ArticleListPresenter();
 
 
     @Override
     public final View onCreateView(LayoutInflater inflater, ViewGroup container,
-            Bundle savedInstanceState) {
+                                   Bundle savedInstanceState) {
         View rootView = inflater.inflate(R.layout.fragment_recyclerview, container, false);
         initRefreshView(rootView);
 
@@ -94,20 +76,24 @@ public class ArticleListFragment extends Fragment implements OnRefreshListener,
     @Override
     public void onResume() {
         super.onResume();
-        loadArticlesFromDB();
-    }
 
 
-    private void loadArticlesFromDB() {
-        mAdapter.addItems(DatabaseHelper.getInstance().loadArticles());
+        //参数要求是一个实现了ArticleListView(类似OnClickListener)接口的对象实体，它可以是任何类的实例，只要该类实现了OnClickListener。
+
+        mPresenter.attach(this); //绑定的是接口
+
+        mPresenter.fetchLastestArticles(); //进行获取数据操作 ，通过接口回调给ui层
     }
+
 
     /**
      * 初始化控件
+     *
      * @param rootView
      */
     protected void initRefreshView(View rootView) {
         mSwipeRefreshLayout = (SwipeRefreshLayout) rootView.findViewById(R.id.swipe_container);
+
         mSwipeRefreshLayout.setOnRefreshListener(this);
 
         mRecyclerView = (AutoLoadRecyclerView) rootView.findViewById(R.id.articles_recycler_view);
@@ -132,33 +118,6 @@ public class ArticleListFragment extends Fragment implements OnRefreshListener,
         // 设置Adapter
         mRecyclerView.setAdapter(mAdapter);
 
-        fetchArticles(1); //加载第一页
-    }
-
-
-
-
-    private void fetchArticles(final int page) {
-        mSwipeRefreshLayout.setRefreshing(true);
-
-        HttpFlinger.get(prepareRequestUrl(), mArticleParser, new DataListener<List<Article>>() {
-            @Override
-            public void onComplete(List<Article> result) {
-                // 添加心数据
-                mAdapter.addItems(result);
-                mSwipeRefreshLayout.setRefreshing(false);
-                // 存储文章列表
-                DatabaseHelper.getInstance().saveArticles(result);
-                if (result.size() > 0) {
-                    mPageIndex++;
-                }
-            }
-        });
-    }
-
-    private String prepareRequestUrl() {
-        return "http://www.devtf.cn/api/v1/?type=articles&page=" + mPageIndex
-                + "&count=20&category=1";
     }
 
     protected void jumpToDetailActivity(Article article) {
@@ -170,12 +129,39 @@ public class ArticleListFragment extends Fragment implements OnRefreshListener,
 
     @Override
     public void onRefresh() {
-        fetchArticles(1);
+
+        mPresenter.fetchLastestArticles();
     }
 
     @Override
     public void onLoad() {
+        mPresenter.loadNextPageArticles(); //接口传递  加载更多
+    }
+
+    @Override
+    public void onFetchedArticles(List<Article> result) {
+        mAdapter.addItems(result);
+    }
+
+    @Override
+    public void clearCacheArticles() {
+        mAdapter.clear();
+    }
+
+    @Override
+    public void onShowLoding() {
         mSwipeRefreshLayout.setRefreshing(true);
-        fetchArticles(mPageIndex);
+    }
+
+    @Override
+    public void onHideLoding() {
+        mSwipeRefreshLayout.setRefreshing(false);
+
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        mPresenter.detach(); //防止内存泄漏需要解绑
     }
 }

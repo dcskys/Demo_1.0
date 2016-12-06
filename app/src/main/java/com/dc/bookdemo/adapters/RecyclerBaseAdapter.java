@@ -46,6 +46,12 @@ public  abstract   class RecyclerBaseAdapter<D,V extends ViewHolder> extends Ada
         notifyDataSetChanged();
     }
 
+
+    public void clear() {
+        mDataSet.clear();
+        notifyDataSetChanged();
+    }
+
     /*
     * 绑定数据,主要分为两步,绑定数据与设置每项的点击事件处理
     * @see

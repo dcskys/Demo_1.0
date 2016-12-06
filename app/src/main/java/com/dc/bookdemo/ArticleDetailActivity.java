@@ -20,6 +20,8 @@ import android.widget.ProgressBar;
 
 import com.android.volley.VolleyError;
 import com.dc.bookdemo.beans.ArticleDetail;
+import com.dc.bookdemo.mvpview.ArticleDetailView;
+import com.dc.bookdemo.presenter.ArticleDetailPresenter;
 
 import java.io.BufferedReader;
 import java.io.InputStream;
@@ -39,7 +41,7 @@ import frontier.net.StringParser;
  * 
  * @author mrsimple
  */
-public class ArticleDetailActivity extends BaseActionBarActivity {
+public class ArticleDetailActivity extends BaseActionBarActivity implements ArticleDetailView {
 
     ProgressBar mProgressBar;  //没有进行分装
     WebView mWebView;
@@ -47,7 +49,8 @@ public class ArticleDetailActivity extends BaseActionBarActivity {
     private String mTitle;
 
     String mJobUrl;
-    StringParser  mStringParser = new StringParser();
+
+    ArticleDetailPresenter mPresenter = new ArticleDetailPresenter();
 
 
     @Override
@@ -98,48 +101,41 @@ public class ArticleDetailActivity extends BaseActionBarActivity {
             mJobUrl = extraBundle.getString("job_url");
         }
 
+        mPresenter.attach(this); //绑定接口
 
-        // 从数据库上获取文章内容缓存
-        ArticleDetail cacheDetail = DatabaseHelper.getInstance().loadArticleDetail(mPostId);
-        if (!TextUtils.isEmpty(cacheDetail.content)) {
-            loadArticle2Webview(cacheDetail.content);//缓存内容不为空 ，加载缓存
-        } else if (!TextUtils.isEmpty(mPostId)) {//网络加载
-            fetchArticleContent();
+
+        // 从数据库上获取文章内容缓存，如果没有缓存则从网络获取
+        if (!TextUtils.isEmpty(mPostId)) {
+            mPresenter.fetchArticleContent(mPostId, mTitle);
         } else {
-            mWebView.loadUrl(mJobUrl);//错误时加载
+            mWebView.loadUrl(mJobUrl);
         }
 
 
     }
 
 
-    /**
-     * 重构  这里封装了网络层
-     */
-    private void fetchArticleContent() {
-
-        String reqURL = "http://www.devtf.cn/api/v1/?type=article&post_id=" + mPostId;
-
-        HttpFlinger.get(reqURL,mStringParser,
-                new DataListener<String>() {
-                    @Override
-                    public void onComplete(String result) {
-                        loadArticle2Webview(result);  //网络请求的结果为空
-                        if (result!=null){
-                            DatabaseHelper.getInstance().saveArticleDetails(
-                                    new ArticleDetail(mPostId, result));
-                        }
-
-                    }
-                });
-
-    }
 
 
-    private void loadArticle2Webview(String htmlContent) {
-        mWebView.loadDataWithBaseURL("", HtmlUtls.wrapArticleContent(mTitle, htmlContent),
+    @Override
+    public void onFetchedArticleContent(String html) {
+        mWebView.loadDataWithBaseURL("", html,
                 "text/html", "utf8", "404");
     }
 
+    @Override
+    public void onShowLoding() {
+        mProgressBar.setVisibility(View.VISIBLE);
+    }
 
+    @Override
+    public void onHideLoding() {
+        mProgressBar.setVisibility(View.GONE);
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        mPresenter.detach();  //防止内存泄漏
+    }
 }
