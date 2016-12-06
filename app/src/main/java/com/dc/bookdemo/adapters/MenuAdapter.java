@@ -48,71 +48,23 @@ import frontier.listeners.OnItemClickListener;
  * 
  * @author mrsimple
  */
-public class MenuAdapter  extends Adapter<MenuViewHolder> {
-
-    List<MenuItem> mDataSet = new ArrayList<MenuItem>();
-
-    OnItemClickListener<MenuItem> mItemClickListener; //接口
-
-    public MenuAdapter(List<MenuItem> dataSet) {
-        mDataSet = dataSet;
-    }
-
-    @Override
-    public MenuAdapter.MenuViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
-        return new MenuViewHolder(inflateItemView(parent, R.layout.menu_item));//返回一个view
-    }
-
-    @Override
-    public void onBindViewHolder(MenuViewHolder holder, int position) {
-        final MenuItem item = getItem(position);
-        holder.nameTextView.setText(item.text);
-        holder.userImageView.setImageResource(item.iconResId);
-        setupItemViewClickListener(holder, item);
-
-    }
-
-
-    public void setOnItemClickListener(OnItemClickListener<MenuItem> clickListener) {
-        this.mItemClickListener = clickListener;
-    }
-
-    /**
-     * ItemView的点击事件
-     *
-     * @param viewHolder
-     * @param item
-     */
-    protected void setupItemViewClickListener(MenuViewHolder viewHolder, final MenuItem item) {
-
-        viewHolder.itemView.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if (mItemClickListener != null) {
-                    mItemClickListener.onClick(item);  // 把每一项通过接口传递
-                }
-            }
-        });
-    }
-
-    protected MenuItem getItem(int position) {
-        return mDataSet.get(position);
-    }
-
-
-
-    protected View inflateItemView(ViewGroup viewGroup, int layoutId) {
-        return LayoutInflater.from(viewGroup.getContext()).inflate(layoutId, viewGroup, false);
-    }
-
+public class MenuAdapter  extends  RecyclerBaseAdapter<MenuItem,MenuViewHolder> {
 
 
     @Override
-    public int getItemCount() {
-        return mDataSet.size();
+    protected void bindDataToItemView(MenuViewHolder viewHolder, MenuItem item) {
+        viewHolder.nameTextView.setText(item.text);
+        viewHolder.userImageView.setImageResource(item.iconResId);
     }
 
-    public static class MenuViewHolder extends RecyclerView.ViewHolder {
+    @Override
+    public MenuViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+        return new MenuViewHolder(inflateItemView(parent, R.layout.menu_item));
+    }
+
+
+
+    static class MenuViewHolder extends RecyclerView.ViewHolder {
         public ImageView userImageView;
         public TextView nameTextView;
 
@@ -122,6 +74,7 @@ public class MenuAdapter  extends Adapter<MenuViewHolder> {
             nameTextView = (TextView) itemView.findViewById(R.id.menu_text_tv);
         }
     }
+
 
 
 }

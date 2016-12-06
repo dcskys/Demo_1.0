@@ -158,7 +158,6 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     }
 
 
-
     public void saveArticleDetails(ArticleDetail detail) {
         mDatabase.insertWithOnConflict(TABLE_ARTICLE_CONTENT, null,
                 articleDetailtoContentValues(detail),

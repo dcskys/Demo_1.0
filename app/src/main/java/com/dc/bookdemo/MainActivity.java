@@ -21,11 +21,11 @@ import java.util.List;
 
 import frontier.listeners.OnItemClickListener;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends BaseActionBarActivity {
 
 
     protected FragmentManager mFragmentManager;
-    Fragment mArticleFragment = new WenzhangFragment();
+    Fragment mArticleFragment = new ArticleListFragment();
     Fragment mAboutFragment;
     private DrawerLayout mDrawerLayout;
     private RecyclerView mMenuRecyclerView;
@@ -34,71 +34,82 @@ public class MainActivity extends AppCompatActivity {
 
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
+    protected int getContentViewResId() {
+        return R.layout.activity_main;
+    }
 
 
+    //重写父类的方法
+    @Override
+    protected void initWidgets() {
         mFragmentManager = getFragmentManager();
+        setupDrawerToggle();
+        setupMenuRecyclerView();
 
-        mToolbar = (Toolbar) findViewById(R.id.toolbar);
-        mToolbar.setTitle(R.string.app_name);
-        setSupportActionBar(mToolbar);
-        getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-        mToolbar.setNavigationOnClickListener(new View.OnClickListener() {
+        // 显示文章列表Fragment
+        addFragment(mArticleFragment);
 
-            @Override
-            public void onClick(View v) {
-                finish();
-            }
-        });
+    }
 
 
+    private void setupDrawerToggle() {
         mDrawerLayout = (DrawerLayout) findViewById(R.id.drawer);
         mDrawerToggle = new ActionBarDrawerToggle(this, mDrawerLayout, mToolbar,
                 R.string.drawer_open,
                 R.string.drawer_close);
         mDrawerToggle.syncState();
         mDrawerLayout.setDrawerListener(mDrawerToggle);
+    }
 
+
+    private void setupMenuRecyclerView() {
         mMenuRecyclerView = (RecyclerView) findViewById(R.id.menu_recyclerview);
         mMenuRecyclerView.setLayoutManager(new LinearLayoutManager(getApplicationContext()));
+        // 初始化菜单Adapter
+        MenuAdapter menuAdapter = new MenuAdapter();
+        menuAdapter.addItems(prepareMenuItems());
+        menuAdapter.setOnItemClickListener(new OnItemClickListener<MenuItem>() {
+            @Override
+            public void onClick(MenuItem item) {
+                clickMenuItem(item);
+            }
+        });
+        mMenuRecyclerView.setAdapter(menuAdapter);
+    }
+
+
+    private List<MenuItem> prepareMenuItems() {
         List<MenuItem> menuItems = new ArrayList<MenuItem>();
         menuItems.add(new MenuItem(getString(R.string.article), R.drawable.home));
         menuItems.add(new MenuItem(getString(R.string.about_menu), R.drawable.about));
         menuItems.add(new MenuItem(getString(R.string.exit), R.drawable.exit));
-        MenuAdapter menuAdapter = new MenuAdapter(menuItems);
-
-        menuAdapter.setOnItemClickListener(new OnItemClickListener<MenuItem>() {
-            @Override
-            public void onClick(MenuItem item) {  //接口实现
-                clickMenuItem(item);
-            }
-        });
-
-        mMenuRecyclerView.setAdapter(menuAdapter);
-
-        mFragmentManager.beginTransaction().add(R.id.articles_container, mArticleFragment)
-                .commitAllowingStateLoss();
-
+        return menuItems;
     }
+
+
+    protected void addFragment(Fragment fragment) {
+        mFragmentManager.beginTransaction().add(R.id.articles_container, fragment).commit();
+    }
+
+    protected void replaceFragment(Fragment fragment) {
+        mFragmentManager.beginTransaction().replace(R.id.articles_container, fragment).commit();
+    }
+
+
+
 
     private void clickMenuItem(MenuItem item) {
         mDrawerLayout.closeDrawers();
         switch (item.iconResId) {
             case R.drawable.home: // 全部
-                mFragmentManager.beginTransaction()
-                        .replace(R.id.articles_container, mArticleFragment)
-                        .commit();
+                replaceFragment(mArticleFragment);
                 break;
 
             case R.drawable.about: // 招聘信息
                 if (mAboutFragment == null) {
-                    mAboutFragment = new GuanyuFragment();
+                    mAboutFragment = new AboutFragment();
                 }
-                mFragmentManager.beginTransaction()
-                        .replace(R.id.articles_container, mAboutFragment)
-                        .commit();
+                replaceFragment(mAboutFragment);
                 break;
 
             case R.drawable.exit: // 退出

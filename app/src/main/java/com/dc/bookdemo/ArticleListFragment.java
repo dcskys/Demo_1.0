@@ -55,7 +55,10 @@ import java.util.LinkedList;
 import java.util.List;
 
 import frontier.db.DatabaseHelper;
+import frontier.listeners.DataListener;
 import frontier.listeners.OnItemClickListener;
+import frontier.net.ArticleParser;
+import frontier.net.HttpFlinger;
 import frontier.widgets.AutoLoadRecyclerView;
 
 /**
@@ -63,17 +66,17 @@ import frontier.widgets.AutoLoadRecyclerView;
  * 
  * @author mrsimple
  */
-public class WenzhangFragment extends Fragment implements OnRefreshListener,
+public class ArticleListFragment extends Fragment implements OnRefreshListener,
         AutoLoadRecyclerView.OnLoadListener {
 
-    protected int mCategory = Article.ALL;
     protected ArticleAdapter mAdapter;
-
     protected SwipeRefreshLayout mSwipeRefreshLayout; //刷新控件
     protected AutoLoadRecyclerView mRecyclerView;
 
-    final protected List<Article> mDataSet = new ArrayList<Article>();
     private int mPageIndex = 1;
+
+    ArticleParser mArticleParser = new ArticleParser(); //json解析器 ，解析网络返回
+
 
     @Override
     public final View onCreateView(LayoutInflater inflater, ViewGroup container,
@@ -91,8 +94,12 @@ public class WenzhangFragment extends Fragment implements OnRefreshListener,
     @Override
     public void onResume() {
         super.onResume();
-        mDataSet.addAll(DatabaseHelper.getInstance().loadArticles()); //加载缓存 用户先看到缓存
-        mAdapter.notifyDataSetChanged();
+        loadArticlesFromDB();
+    }
+
+
+    private void loadArticlesFromDB() {
+        mAdapter.addItems(DatabaseHelper.getInstance().loadArticles());
     }
 
     /**
@@ -112,133 +119,50 @@ public class WenzhangFragment extends Fragment implements OnRefreshListener,
     }
 
     protected void initAdapter() {
-        mAdapter = new ArticleAdapter(mDataSet);
+        mAdapter = new ArticleAdapter();
         mAdapter.setOnItemClickListener(new OnItemClickListener<Article>() {
 
             @Override
             public void onClick(Article article) {
                 if (article != null) {
-                    loadArticle(article);
+                    jumpToDetailActivity(article);
                 }
             }
         });
         // 设置Adapter
         mRecyclerView.setAdapter(mAdapter);
 
-
-        getArticles(1); //加载第一页
+        fetchArticles(1); //加载第一页
     }
 
-    public void setArticleCategory(int category) {
-        mCategory = category;
-    }
 
-    private void getArticles(final int page) {
-        new AsyncTask<Void, Void, List<Article>>() {
 
-            protected void onPreExecute() {
-                mSwipeRefreshLayout.setRefreshing(true);
-            };
 
+    private void fetchArticles(final int page) {
+        mSwipeRefreshLayout.setRefreshing(true);
+
+        HttpFlinger.get(prepareRequestUrl(), mArticleParser, new DataListener<List<Article>>() {
             @Override
-            protected List<Article> doInBackground(Void... params) {
-                return performRequest(page);
-            }
-
-            protected void onPostExecute(List<Article> result) {
-                // 移除已经更新的数据
-                result.removeAll(mDataSet);
+            public void onComplete(List<Article> result) {
                 // 添加心数据
-                mDataSet.addAll(result);
-                mAdapter.notifyDataSetChanged();
+                mAdapter.addItems(result);
                 mSwipeRefreshLayout.setRefreshing(false);
-
                 // 存储文章列表
                 DatabaseHelper.getInstance().saveArticles(result);
                 if (result.size() > 0) {
                     mPageIndex++;
                 }
-
-            };
-        }.execute();
-    }
-
-    /**
-     *
-     * 子线程    网络获取
-     * @param page
-     * @return
-     */
-    private List<Article> performRequest(int page) {
-        HttpURLConnection urlConnection = null;
-        try {
-            String getUrl =
-                    "http://www.devtf.cn/api/v1/?type=articles&page=" + mPageIndex
-                            + "&count=20&category=1";
-            urlConnection = (HttpURLConnection) new URL(getUrl)
-                    .openConnection();
-            urlConnection.connect();
-            BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(
-                    urlConnection.getInputStream()));
-            StringBuilder sBuilder = new StringBuilder();
-            String line = null;
-            while ((line = bufferedReader.readLine()) != null) {
-                sBuilder.append(line).append("\n");
             }
-            String result = sBuilder.toString();
-            return parse(new JSONArray(result)); //返回一个列表
-        } catch (Exception e) {
-            e.printStackTrace();
-        } finally {
-            urlConnection.disconnect();
-        }
-
-        return new ArrayList<Article>();
+        });
     }
 
-    /**
-     * 解析josn
-     * @param jsonArray
-     * @return
-     */
-    @SuppressLint("SimpleDateFormat")
-    private List<Article> parse(JSONArray jsonArray) {
-        List<Article> articleLists = new LinkedList<Article>();
-        int count = jsonArray.length();
-        SimpleDateFormat dateformat = new SimpleDateFormat("yyyy-MM-dd HH:mm");
-        for (int i = 0; i < count; i++) {
-            JSONObject itemObject = jsonArray.optJSONObject(i);
-            Article articleItem = new Article();
-            articleItem.title = itemObject.optString("title");
-            articleItem.author = itemObject.optString("author");
-            articleItem.post_id = itemObject.optString("post_id");
-            String category = itemObject.optString("category");
-            articleItem.category = TextUtils.isEmpty(category) ? 0 : Integer.valueOf(category);
-            articleItem.publishTime = formatDate(dateformat, itemObject.optString("date"));
-            Log.d("", "title : " + articleItem.title + ", id = " + articleItem.post_id);
-            articleLists.add(articleItem);
-        }
-        return articleLists;
+    private String prepareRequestUrl() {
+        return "http://www.devtf.cn/api/v1/?type=articles&page=" + mPageIndex
+                + "&count=20&category=1";
     }
 
-
-    /**日期转化
-     * @param dateFormat
-     * @param dateString
-     * @return
-     */
-    private String formatDate(SimpleDateFormat dateFormat, String dateString) {
-        try {
-            Date date = dateFormat.parse(dateString);
-            return dateFormat.format(date);
-        } catch (ParseException e) {
-            e.printStackTrace();
-        }
-        return "";
-    }
-
-    protected void loadArticle(Article article) {
-        Intent intent = new Intent(getActivity(), NeirongActivity.class);
+    protected void jumpToDetailActivity(Article article) {
+        Intent intent = new Intent(getActivity(), ArticleDetailActivity.class);
         intent.putExtra("post_id", article.post_id);
         intent.putExtra("title", article.title);
         startActivity(intent);
@@ -246,12 +170,12 @@ public class WenzhangFragment extends Fragment implements OnRefreshListener,
 
     @Override
     public void onRefresh() {
-        getArticles(1);
+        fetchArticles(1);
     }
 
     @Override
     public void onLoad() {
         mSwipeRefreshLayout.setRefreshing(true);
-        getArticles(mPageIndex);
+        fetchArticles(mPageIndex);
     }
 }
